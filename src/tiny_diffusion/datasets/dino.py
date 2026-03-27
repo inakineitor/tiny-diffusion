@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import polars as pl
 import torch
@@ -6,10 +7,27 @@ from torch.utils.data import TensorDataset
 
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data" / "input" / "dinosaur"
 
+type DatasaurusShape = Literal[
+    "away",
+    "bullseye",
+    "circle",
+    "dino",
+    "dots",
+    "h_lines",
+    "high_lines",
+    "slant_down",
+    "slant_up",
+    "star",
+    "v_lines",
+    "wide_lines",
+    "x_shape",
+]
 
-def dino_dataset(n: int = 8000):
+
+def dino_dataset(n: int = 8000, shapes: list[DatasaurusShape] | None = None):
     df = pl.read_csv(_DATA_DIR / "datasaurus-dozen.tsv", separator="\t")
-    df = df.filter(pl.col("dataset") == "dino")
+    if shapes is not None:
+        df = df.filter(pl.col("dataset").is_in(shapes))
 
     gen = torch.Generator().manual_seed(42)
     ix = torch.randint(0, len(df), (n,), generator=gen)
