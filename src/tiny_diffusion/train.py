@@ -74,7 +74,9 @@ def main(
 
     noise_scheduler = NoiseScheduler(num_timesteps=num_timesteps, beta_schedule=beta_schedule.value)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
+    )
     print(f"Using device: {device}")
     model = model.to(device)
     noise_scheduler = noise_scheduler.to(device)
@@ -89,7 +91,7 @@ def main(
     losses = []
     print("Training model...")
     for epoch in range(num_epochs):
-        model.train()
+        _ = model.train()
         progress_bar = tqdm(total=len(dataloader))
         progress_bar.set_description(f"Epoch {epoch}")
         for _step, batch in enumerate(dataloader):
@@ -114,7 +116,7 @@ def main(
 
         if epoch % save_images_step == 0 or epoch == num_epochs - 1:
             # generate data with the model to later visualize the learning process
-            model.eval()
+            _ = model.eval()
             sample = torch.randn(eval_batch_size, 2, device=device)
             timesteps = list(range(len(noise_scheduler)))[::-1]
             for _i, t in enumerate(tqdm(timesteps)):

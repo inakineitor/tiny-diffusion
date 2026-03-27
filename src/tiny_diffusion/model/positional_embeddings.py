@@ -3,6 +3,7 @@
 These are not essential for understanding DDPMs, but are relevant for the ablation study.
 """
 
+import math
 from typing import Literal, cast, override
 
 import torch
@@ -40,11 +41,9 @@ class SinusoidalEmbedding(PositionalEmbeddingLayer):
     def forward(self, x: torch.Tensor):
         x = x * self.scale
         half_size = self.num_embedding_dims // 2
-        emb = torch.log(torch.tensor([10000.0], device=x.device)) / (half_size - 1)
-        emb = torch.exp(-emb * torch.arange(half_size, device=x.device))
-        emb = x.unsqueeze(-1) * emb.unsqueeze(0)
-        emb = torch.cat((torch.sin(emb), torch.cos(emb)), dim=-1)
-        return emb
+        emb = torch.exp(-math.log(10000.0) / (half_size - 1) * torch.arange(half_size, device=x.device))
+        emb = x.unsqueeze(-1) * emb
+        return torch.cat((torch.sin(emb), torch.cos(emb)), dim=-1)
 
 
 class LinearEmbedding(PositionalEmbeddingLayer):

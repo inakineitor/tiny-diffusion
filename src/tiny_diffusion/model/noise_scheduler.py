@@ -3,18 +3,8 @@ from typing import Literal, cast
 import torch
 
 
-class NoiseScheduler:
+class NoiseScheduler(torch.nn.Module):
     num_timesteps: int
-    betas: torch.Tensor
-    alphas: torch.Tensor
-    alphas_cumprod: torch.Tensor
-    alphas_cumprod_prev: torch.Tensor
-    sqrt_alphas_cumprod: torch.Tensor
-    sqrt_one_minus_alphas_cumprod: torch.Tensor
-    sqrt_inv_alphas_cumprod: torch.Tensor
-    sqrt_inv_alphas_cumprod_minus_one: torch.Tensor
-    posterior_mean_coef1: torch.Tensor
-    posterior_mean_coef2: torch.Tensor
 
     def __init__(
         self,
@@ -23,12 +13,13 @@ class NoiseScheduler:
         beta_end: float = 0.02,
         beta_schedule: Literal["linear", "quadratic"] = "linear",
     ):
+        super().__init__()
         self.num_timesteps = num_timesteps
         match beta_schedule:
             case "linear":
-                self.betas = torch.linspace(beta_start, beta_end, num_timesteps, dtype=torch.float32)
+                betas = torch.linspace(beta_start, beta_end, num_timesteps, dtype=torch.float32)
             case "quadratic":
-                self.betas = (
+                betas = (
                     torch.linspace(
                         cast(float, beta_start**0.5),
                         cast(float, beta_end**0.5),
@@ -38,23 +29,32 @@ class NoiseScheduler:
                     ** 2
                 )
 
-        self.alphas = 1.0 - self.betas
-        self.alphas_cumprod = torch.cumprod(self.alphas, dim=0)
-        self.alphas_cumprod_prev = torch.nn.functional.pad(self.alphas_cumprod[:-1], (1, 0), value=1.0)
+        alphas = 1.0 - betas
+        alphas_cumprod = torch.cumprod(alphas, dim=0)
+        alphas_cumprod_prev = torch.nn.functional.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
 
         # required for self.add_noise
-        self.sqrt_alphas_cumprod = self.alphas_cumprod**0.5
-        self.sqrt_one_minus_alphas_cumprod = (1 - self.alphas_cumprod) ** 0.5
+        sqrt_alphas_cumprod = alphas_cumprod.sqrt()
+        sqrt_one_minus_alphas_cumprod = (1 - alphas_cumprod).sqrt()
 
-        # required for reconstruct_x0
-        self.sqrt_inv_alphas_cumprod = torch.sqrt(1 / self.alphas_cumprod)
-        self.sqrt_inv_alphas_cumprod_minus_one = torch.sqrt(1 / self.alphas_cumprod - 1)
+        # required for reconstruct_x0 (derived from above instead of recomputing)
+        sqrt_inv_alphas_cumprod = 1.0 / sqrt_alphas_cumprod
+        sqrt_inv_alphas_cumprod_minus_one = sqrt_one_minus_alphas_cumprod / sqrt_alphas_cumprod
 
         # required for q_posterior
-        self.posterior_mean_coef1 = self.betas * torch.sqrt(self.alphas_cumprod_prev) / (1.0 - self.alphas_cumprod)
-        self.posterior_mean_coef2 = (
-            (1.0 - self.alphas_cumprod_prev) * torch.sqrt(self.alphas) / (1.0 - self.alphas_cumprod)
-        )
+        posterior_mean_coef1 = betas * alphas_cumprod_prev.sqrt() / (1.0 - alphas_cumprod)
+        posterior_mean_coef2 = (1.0 - alphas_cumprod_prev) * alphas.sqrt() / (1.0 - alphas_cumprod)
+
+        self.register_buffer("betas", betas)
+        self.register_buffer("alphas", alphas)
+        self.register_buffer("alphas_cumprod", alphas_cumprod)
+        self.register_buffer("alphas_cumprod_prev", alphas_cumprod_prev)
+        self.register_buffer("sqrt_alphas_cumprod", sqrt_alphas_cumprod)
+        self.register_buffer("sqrt_one_minus_alphas_cumprod", sqrt_one_minus_alphas_cumprod)
+        self.register_buffer("sqrt_inv_alphas_cumprod", sqrt_inv_alphas_cumprod)
+        self.register_buffer("sqrt_inv_alphas_cumprod_minus_one", sqrt_inv_alphas_cumprod_minus_one)
+        self.register_buffer("posterior_mean_coef1", posterior_mean_coef1)
+        self.register_buffer("posterior_mean_coef2", posterior_mean_coef2)
 
     def reconstruct_x0(self, x_t: torch.Tensor, t: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
         s1 = self.sqrt_inv_alphas_cumprod[t]
@@ -76,20 +76,16 @@ class NoiseScheduler:
             return torch.tensor(0.0)
 
         variance = self.betas[t] * (1.0 - self.alphas_cumprod_prev[t]) / (1.0 - self.alphas_cumprod[t])
-        variance = variance.clip(1e-20)
-        return variance
+        return variance.clamp(min=1e-20)
 
     def step(self, model_output: torch.Tensor, timestep: torch.Tensor, sample: torch.Tensor) -> torch.Tensor:
         t = timestep
         pred_original_sample = self.reconstruct_x0(sample, t, model_output)
         pred_prev_sample = self.q_posterior(pred_original_sample, sample, t)
 
-        variance = 0
         if t > 0:
             noise = torch.randn_like(model_output)
-            variance = (self.get_variance(t) ** 0.5) * noise
-
-        pred_prev_sample = pred_prev_sample + variance
+            pred_prev_sample = pred_prev_sample + self.get_variance(t).sqrt() * noise
 
         return pred_prev_sample
 
@@ -101,19 +97,6 @@ class NoiseScheduler:
         s2 = s2.reshape(-1, 1)
 
         return s1 * x_start + s2 * x_noise
-
-    def to(self, device: torch.device) -> NoiseScheduler:
-        self.betas = self.betas.to(device)
-        self.alphas = self.alphas.to(device)
-        self.alphas_cumprod = self.alphas_cumprod.to(device)
-        self.alphas_cumprod_prev = self.alphas_cumprod_prev.to(device)
-        self.sqrt_alphas_cumprod = self.sqrt_alphas_cumprod.to(device)
-        self.sqrt_one_minus_alphas_cumprod = self.sqrt_one_minus_alphas_cumprod.to(device)
-        self.sqrt_inv_alphas_cumprod = self.sqrt_inv_alphas_cumprod.to(device)
-        self.sqrt_inv_alphas_cumprod_minus_one = self.sqrt_inv_alphas_cumprod_minus_one.to(device)
-        self.posterior_mean_coef1 = self.posterior_mean_coef1.to(device)
-        self.posterior_mean_coef2 = self.posterior_mean_coef2.to(device)
-        return self
 
     def __len__(self) -> int:
         return self.num_timesteps
