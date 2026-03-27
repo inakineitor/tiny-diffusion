@@ -42,7 +42,7 @@ def main(
     sample = torch.randn(num_samples, 2, device=device)
     timesteps = list(range(len(noise_scheduler)))[::-1]
     for t in tqdm(timesteps, desc="Sampling"):
-        t_batch = torch.from_numpy(np.repeat(t, num_samples)).long().to(device)
+        t_batch = torch.full((num_samples,), t, dtype=torch.long, device=device)
         with torch.no_grad():
             residual = model(sample, t_batch)
         sample = noise_scheduler.step(residual, t_batch[0], sample)

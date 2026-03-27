@@ -107,9 +107,8 @@ def main(
             optimizer.zero_grad()
 
             progress_bar.update(1)
-            logs = {"loss": loss.detach().item(), "step": global_step}
             losses.append(loss.detach().item())
-            progress_bar.set_postfix(**logs)
+            progress_bar.set_postfix(loss=loss.detach().item(), step=global_step)
             global_step += 1
         progress_bar.close()
 
@@ -119,10 +118,10 @@ def main(
             sample = torch.randn(eval_batch_size, 2, device=device)
             timesteps = list(range(len(noise_scheduler)))[::-1]
             for _i, t in enumerate(tqdm(timesteps)):
-                t = torch.from_numpy(np.repeat(t, eval_batch_size)).long().to(device)
+                t_batch = torch.full((eval_batch_size,), t, dtype=torch.long, device=device)
                 with torch.no_grad():
-                    residual = model(sample, t)
-                sample = noise_scheduler.step(residual, t[0], sample)
+                    residual = model(sample, t_batch)
+                sample = noise_scheduler.step(residual, t_batch[0], sample)
             frames.append(sample.cpu().numpy())
 
     print("Saving model...")

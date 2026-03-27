@@ -56,14 +56,14 @@ class NoiseScheduler:
             (1.0 - self.alphas_cumprod_prev) * torch.sqrt(self.alphas) / (1.0 - self.alphas_cumprod)
         )
 
-    def reconstruct_x0(self, x_t, t, noise):
+    def reconstruct_x0(self, x_t: torch.Tensor, t: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
         s1 = self.sqrt_inv_alphas_cumprod[t]
         s2 = self.sqrt_inv_alphas_cumprod_minus_one[t]
         s1 = s1.reshape(-1, 1)
         s2 = s2.reshape(-1, 1)
         return s1 * x_t - s2 * noise
 
-    def q_posterior(self, x_0, x_t, t):
+    def q_posterior(self, x_0: torch.Tensor, x_t: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
         s1 = self.posterior_mean_coef1[t]
         s2 = self.posterior_mean_coef2[t]
         s1 = s1.reshape(-1, 1)
@@ -71,15 +71,15 @@ class NoiseScheduler:
         mu = s1 * x_0 + s2 * x_t
         return mu
 
-    def get_variance(self, t):
+    def get_variance(self, t: torch.Tensor) -> torch.Tensor:
         if t == 0:
-            return 0
+            return torch.tensor(0.0)
 
         variance = self.betas[t] * (1.0 - self.alphas_cumprod_prev[t]) / (1.0 - self.alphas_cumprod[t])
         variance = variance.clip(1e-20)
         return variance
 
-    def step(self, model_output, timestep, sample):
+    def step(self, model_output: torch.Tensor, timestep: torch.Tensor, sample: torch.Tensor) -> torch.Tensor:
         t = timestep
         pred_original_sample = self.reconstruct_x0(sample, t, model_output)
         pred_prev_sample = self.q_posterior(pred_original_sample, sample, t)
@@ -93,7 +93,7 @@ class NoiseScheduler:
 
         return pred_prev_sample
 
-    def add_noise(self, x_start, x_noise, timesteps):
+    def add_noise(self, x_start: torch.Tensor, x_noise: torch.Tensor, timesteps: torch.Tensor) -> torch.Tensor:
         s1 = self.sqrt_alphas_cumprod[timesteps]
         s2 = self.sqrt_one_minus_alphas_cumprod[timesteps]
 
@@ -102,7 +102,7 @@ class NoiseScheduler:
 
         return s1 * x_start + s2 * x_noise
 
-    def to(self, device: torch.device):
+    def to(self, device: torch.device) -> NoiseScheduler:
         self.betas = self.betas.to(device)
         self.alphas = self.alphas.to(device)
         self.alphas_cumprod = self.alphas_cumprod.to(device)
@@ -115,5 +115,5 @@ class NoiseScheduler:
         self.posterior_mean_coef2 = self.posterior_mean_coef2.to(device)
         return self
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.num_timesteps
