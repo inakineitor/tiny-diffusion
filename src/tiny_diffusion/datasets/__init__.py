@@ -1,11 +1,21 @@
 from typing import Literal
 
 from .circle import circle_dataset
-from .dino import DatasaurusShape, dino_dataset
+from .dino import DATASAURUS_SHAPES, NUM_DATASAURUS_SHAPES, SHAPE_TO_INDEX, DatasaurusShape, dino_dataset
 from .line import line_dataset
 from .moons import moons_dataset
 
-__all__ = ["DatasaurusShape", "circle_dataset", "dino_dataset", "get_dataset", "line_dataset", "moons_dataset"]
+__all__ = [
+    "DATASAURUS_SHAPES",
+    "NUM_DATASAURUS_SHAPES",
+    "SHAPE_TO_INDEX",
+    "DatasaurusShape",
+    "circle_dataset",
+    "dino_dataset",
+    "get_dataset",
+    "line_dataset",
+    "moons_dataset",
+]
 
 type DatasetName = Literal["moons", "dino", "line", "circle"]
 

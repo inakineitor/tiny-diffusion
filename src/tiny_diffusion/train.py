@@ -60,8 +60,16 @@ def main(
     time_embedding: Annotated[TimeEmbedding, typer.Option()] = TimeEmbedding.sinusoidal,
     input_embedding: Annotated[InputEmbedding, typer.Option()] = InputEmbedding.sinusoidal,
     save_images_step: Annotated[int, typer.Option()] = 1,
+    num_classes: Annotated[int, typer.Option(help="Number of classes for conditional generation (0=uncond)")] = 0,
+    cfg_dropout: Annotated[float, typer.Option(help="Classifier-free guidance dropout probability")] = 0.1,
+    guidance_scale: Annotated[float, typer.Option(help="CFG guidance scale for eval sampling")] = 3.0,
 ):
     ds = datasets.get_dataset(dataset.value)
+    has_labels = len(ds[0]) > 1
+    if num_classes > 0 and not has_labels:
+        print(f"Warning: --num-classes={num_classes} but dataset '{dataset.value}' has no labels. Ignoring.")
+        num_classes = 0
+
     dataloader = DataLoader(ds, batch_size=train_batch_size, shuffle=True, drop_last=True)
 
     model = Block(
@@ -70,6 +78,8 @@ def main(
         embedding_size=embedding_size,
         time_embedding_type=time_embedding.value,
         embedding_type=input_embedding.value,
+        num_classes=num_classes,
+        cfg_dropout_prob=cfg_dropout,
     )
 
     noise_scheduler = NoiseScheduler(num_timesteps=num_timesteps, beta_schedule=beta_schedule.value)
@@ -78,6 +88,7 @@ def main(
         "cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu"
     )
     print(f"Using device: {device}")
+    print(f"Class-conditional: {num_classes > 0} (num_classes={num_classes})")
     model = model.to(device)
     noise_scheduler = noise_scheduler.to(device)
 
@@ -85,6 +96,10 @@ def main(
         model.parameters(),
         lr=learning_rate,
     )
+
+    eval_labels = torch.arange(max(num_classes, 1), device=device).repeat(eval_batch_size // max(num_classes, 1) + 1)[
+        :eval_batch_size
+    ]
 
     global_step = 0
     frames = []
@@ -95,12 +110,14 @@ def main(
         progress_bar = tqdm(total=len(dataloader))
         progress_bar.set_description(f"Epoch {epoch}")
         for _step, batch in enumerate(dataloader):
-            batch = batch[0].to(device)
-            noise = torch.randn(batch.shape, device=device)
-            timesteps = torch.randint(0, noise_scheduler.num_timesteps, (batch.shape[0],), device=device).long()
+            coords = batch[0].to(device)
+            class_label = batch[1].to(device) if has_labels and num_classes > 0 else None
 
-            noisy = noise_scheduler.add_noise(batch, noise, timesteps)
-            noise_pred = model(noisy, timesteps)
+            noise = torch.randn(coords.shape, device=device)
+            timesteps = torch.randint(0, noise_scheduler.num_timesteps, (coords.shape[0],), device=device).long()
+
+            noisy = noise_scheduler.add_noise(coords, noise, timesteps)
+            noise_pred = model(noisy, timesteps, class_label)
             loss = F.mse_loss(noise_pred, noise)
             loss.backward()
 
@@ -115,14 +132,21 @@ def main(
         progress_bar.close()
 
         if epoch % save_images_step == 0 or epoch == num_epochs - 1:
-            # generate data with the model to later visualize the learning process
             _ = model.eval()
             sample = torch.randn(eval_batch_size, 2, device=device)
+
+            null_labels = torch.full((eval_batch_size,), num_classes, dtype=torch.long, device=device)
+
             timesteps = list(range(len(noise_scheduler)))[::-1]
             for _i, t in enumerate(tqdm(timesteps)):
                 t_batch = torch.full((eval_batch_size,), t, dtype=torch.long, device=device)
                 with torch.no_grad():
-                    residual = model(sample, t_batch)
+                    if num_classes > 0:
+                        noise_cond = model(sample, t_batch, eval_labels)
+                        noise_uncond = model(sample, t_batch, null_labels)
+                        residual = noise_uncond + guidance_scale * (noise_cond - noise_uncond)
+                    else:
+                        residual = model(sample, t_batch)
                 sample = noise_scheduler.step(residual, t_batch[0], sample)
             frames.append(sample.cpu().numpy())
 
@@ -139,7 +163,12 @@ def main(
     ymin, ymax = -6, 6
     for i, frame in enumerate(frames):
         plt.figure(figsize=(10, 10))
-        plt.scatter(frame[:, 0], frame[:, 1])
+        if num_classes > 0:
+            # Color points by class
+            labels_np = eval_labels.cpu().numpy()
+            plt.scatter(frame[:, 0], frame[:, 1], c=labels_np, cmap="tab20", s=5, alpha=0.7)
+        else:
+            plt.scatter(frame[:, 0], frame[:, 1])
         plt.xlim(xmin, xmax)
         plt.ylim(ymin, ymax)
         plt.savefig(f"{imgdir}/{i:04}.png")
