@@ -9,7 +9,7 @@ dependencies = [
   "celluloid>=0.2.0",
   "matplotlib>=3.10.8",
   "numpy>=2.4.3",
-  "pandas>=3.0.1",
+  "polars>=1.39.3",
   "scikit-learn>=1.8.0",
   "torch>=2.11.0",
   "tqdm>=4.67.3",
@@ -23,3 +23,29 @@ model-infer = "tiny_diffusion.infer:app"
 [build-system]
 requires = ["uv_build>=0.11.1,<0.12.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.38.4",
+    "ruff>=0.15.8",
+    "ty>=0.0.26",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "A", "SIM", "C4", "PIE", "RUF", "PERF", "NPY", "FURB"]
+
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = ["E501"]
+
+[tool.basedpyright]
+pythonVersion = "3.14"
+extraPaths = ["src"]
+
+[tool.ty.environment]
+python-version = "3.14"
+extra-paths = ["src"]

@@ -1,50 +1,67 @@
+from typing import cast, override
+
 import torch
-from torch import nn
 
-from .positional_embeddings import PositionalEmbedding
+from .positional_embeddings import (
+    EmbeddingType,
+    PositionalEmbeddingLayer,
+    make_positional_embedding,
+)
 
 
-class Block(nn.Module):
+class Block(torch.nn.Module):
+    ff: torch.nn.Linear
+    act: torch.nn.GELU
+
     def __init__(self, size: int):
         super().__init__()
 
-        self.ff = nn.Linear(size, size)
-        self.act = nn.GELU()
+        self.ff = torch.nn.Linear(size, size)
+        self.act = torch.nn.GELU()
 
+    @override
     def forward(self, x: torch.Tensor):
-        return x + self.act(self.ff(x))
+        mlp_output = cast(torch.Tensor, self.act(self.ff(x)))
+        return x + mlp_output
+
+    @override
+    def __call__(self, x: torch.Tensor):
+        return cast(torch.Tensor, super().__call__(x))
 
 
-class MLP(nn.Module):
+class MLP(torch.nn.Module):
+    time_mlp: PositionalEmbeddingLayer
+    input_mlp_x1: PositionalEmbeddingLayer
+    input_mlp_x2: PositionalEmbeddingLayer
+    joint_mlp: torch.nn.Sequential
+
     def __init__(
         self,
         hidden_size: int = 128,
         hidden_layers: int = 3,
-        emb_size: int = 128,
-        time_emb: str = "sinusoidal",
-        input_emb: str = "sinusoidal",
+        embedding_size: int = 128,
+        time_embedding_type: EmbeddingType = "sinusoidal",
+        embedding_type: EmbeddingType = "sinusoidal",
     ):
         super().__init__()
 
-        self.time_mlp = PositionalEmbedding(emb_size, time_emb)
-        self.input_mlp1 = PositionalEmbedding(emb_size, input_emb, scale=25.0)
-        self.input_mlp2 = PositionalEmbedding(emb_size, input_emb, scale=25.0)
+        self.time_mlp = make_positional_embedding(time_embedding_type, embedding_size)
+        self.input_mlp_x1 = make_positional_embedding(embedding_type, embedding_size, scale=25.0)
+        self.input_mlp_x2 = make_positional_embedding(embedding_type, embedding_size, scale=25.0)
 
-        concat_size = (
-            len(self.time_mlp.layer)
-            + len(self.input_mlp1.layer)
-            + len(self.input_mlp2.layer)
+        concat_size = self.time_mlp.output_dim + self.input_mlp_x1.output_dim + self.input_mlp_x2.output_dim
+        self.joint_mlp = torch.nn.Sequential(
+            torch.nn.Linear(concat_size, hidden_size),
+            torch.nn.GELU(),
+            *(Block(hidden_size) for _ in range(hidden_layers)),
+            torch.nn.Linear(hidden_size, 2),
         )
-        layers = [nn.Linear(concat_size, hidden_size), nn.GELU()]
-        for _ in range(hidden_layers):
-            layers.append(Block(hidden_size))
-        layers.append(nn.Linear(hidden_size, 2))
-        self.joint_mlp = nn.Sequential(*layers)
 
-    def forward(self, x, t):
-        x1_emb = self.input_mlp1(x[:, 0])
-        x2_emb = self.input_mlp2(x[:, 1])
-        t_emb = self.time_mlp(t)
-        x = torch.cat((x1_emb, x2_emb, t_emb), dim=-1)
-        x = self.joint_mlp(x)
+    @override
+    def forward(self, x: torch.Tensor, t: torch.Tensor):
+        x1_embedding = self.input_mlp_x1(x[:, 0])
+        x2_embedding = self.input_mlp_x2(x[:, 1])
+        time_embedding = self.time_mlp(t)
+        x = torch.cat((x1_embedding, x2_embedding, time_embedding), dim=-1)
+        x = cast(torch.Tensor, self.joint_mlp(x))
         return x

@@ -1,94 +1,138 @@
-"""Different methods for positional embeddings. These are not essential for understanding DDPMs, but are relevant for the ablation study."""
+"""Different methods for positional embeddings.
+
+These are not essential for understanding DDPMs, but are relevant for the ablation study.
+"""
+
+from typing import Literal, cast, override
 
 import torch
-from torch import nn
-from torch.nn import functional as F
 
 
-class SinusoidalEmbedding(nn.Module):
-    def __init__(self, size: int, scale: float = 1.0):
+class PositionalEmbeddingLayer(torch.nn.Module):
+    @property
+    def output_dim(self) -> int:
+        raise NotImplementedError
+
+    @override
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError()
+
+    @override
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        return cast(torch.Tensor, super().__call__(x))
+
+
+class SinusoidalEmbedding(PositionalEmbeddingLayer):
+    num_embedding_dims: int
+    scale: float
+
+    def __init__(self, num_embedding_dims: int, scale: float = 1.0):
         super().__init__()
-        self.size = size
+        self.num_embedding_dims = num_embedding_dims
         self.scale = scale
 
+    @property
+    @override
+    def output_dim(self) -> int:
+        return self.num_embedding_dims
+
+    @override
     def forward(self, x: torch.Tensor):
         x = x * self.scale
-        half_size = self.size // 2
-        emb = torch.log(torch.Tensor([10000.0])) / (half_size - 1)
-        emb = torch.exp(-emb * torch.arange(half_size))
+        half_size = self.num_embedding_dims // 2
+        emb = torch.log(torch.tensor([10000.0], device=x.device)) / (half_size - 1)
+        emb = torch.exp(-emb * torch.arange(half_size, device=x.device))
         emb = x.unsqueeze(-1) * emb.unsqueeze(0)
         emb = torch.cat((torch.sin(emb), torch.cos(emb)), dim=-1)
         return emb
 
-    def __len__(self):
-        return self.size
 
+class LinearEmbedding(PositionalEmbeddingLayer):
+    num_embedding_dims: int
+    scale: float
 
-class LinearEmbedding(nn.Module):
-    def __init__(self, size: int, scale: float = 1.0):
+    def __init__(self, num_embedding_dims: int, scale: float = 1.0):
         super().__init__()
-        self.size = size
+        self.num_embedding_dims = num_embedding_dims
         self.scale = scale
 
-    def forward(self, x: torch.Tensor):
-        x = x / self.size * self.scale
-        return x.unsqueeze(-1)
-
-    def __len__(self):
+    @property
+    @override
+    def output_dim(self) -> int:
         return 1
 
-
-class LearnableEmbedding(nn.Module):
-    def __init__(self, size: int):
-        super().__init__()
-        self.size = size
-        self.linear = nn.Linear(1, size)
-
+    @override
     def forward(self, x: torch.Tensor):
-        return self.linear(x.unsqueeze(-1).float() / self.size)
-
-    def __len__(self):
-        return self.size
+        x = x / self.num_embedding_dims * self.scale
+        return x.unsqueeze(-1)
 
 
-class IdentityEmbedding(nn.Module):
+class LearnableEmbedding(PositionalEmbeddingLayer):
+    num_embedding_dims: int
+    linear: torch.nn.Linear
+
+    def __init__(self, num_embedding_dims: int):
+        super().__init__()
+        self.num_embedding_dims = num_embedding_dims
+        self.linear = torch.nn.Linear(1, num_embedding_dims)
+
+    @property
+    @override
+    def output_dim(self) -> int:
+        return self.num_embedding_dims
+
+    @override
+    def forward(self, x: torch.Tensor):
+        return cast(
+            torch.Tensor,
+            self.linear(x.unsqueeze(-1).float() / self.num_embedding_dims),
+        )
+
+
+class IdentityEmbedding(PositionalEmbeddingLayer):
     def __init__(self):
         super().__init__()
 
+    @property
+    @override
+    def output_dim(self) -> int:
+        return 1
+
+    @override
     def forward(self, x: torch.Tensor):
         return x.unsqueeze(-1)
 
-    def __len__(self):
-        return 1
 
-
-class ZeroEmbedding(nn.Module):
+class ZeroEmbedding(PositionalEmbeddingLayer):
     def __init__(self):
         super().__init__()
 
+    @property
+    @override
+    def output_dim(self) -> int:
+        return 1
+
+    @override
     def forward(self, x: torch.Tensor):
         return x.unsqueeze(-1) * 0
 
-    def __len__(self):
-        return 1
+
+type EmbeddingType = Literal["sinusoidal", "linear", "learnable", "zero", "identity"]
 
 
-class PositionalEmbedding(nn.Module):
-    def __init__(self, size: int, type: str, **kwargs):
-        super().__init__()
-
-        if type == "sinusoidal":
-            self.layer = SinusoidalEmbedding(size, **kwargs)
-        elif type == "linear":
-            self.layer = LinearEmbedding(size, **kwargs)
-        elif type == "learnable":
-            self.layer = LearnableEmbedding(size)
-        elif type == "zero":
-            self.layer = ZeroEmbedding()
-        elif type == "identity":
-            self.layer = IdentityEmbedding()
-        else:
-            raise ValueError(f"Unknown positional embedding type: {type}")
-
-    def forward(self, x: torch.Tensor):
-        return self.layer(x)
+def make_positional_embedding(
+    embedding_type: EmbeddingType,
+    num_embedding_dims: int = 0,
+    scale: float = 0,
+):
+    match embedding_type:
+        case "sinusoidal":
+            return SinusoidalEmbedding(num_embedding_dims, scale)
+        case "linear":
+            return LinearEmbedding(num_embedding_dims, scale)
+        case "learnable":
+            return LearnableEmbedding(num_embedding_dims)
+        case "zero":
+            return ZeroEmbedding()
+        case "identity":
+            return IdentityEmbedding()

@@ -1,6 +1,11 @@
 {
   "version": 1,
   "skills": {
+    "pytorch": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "computedHash": "5d8381ff898fc647431c4b64ebdcee7d08c5068fb174500780cf8ae3bd61b4d9"
+    },
     "uv": {
       "source": "astral-sh/claude-code-plugins",
       "sourceType": "github",
