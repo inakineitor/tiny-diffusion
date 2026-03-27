@@ -7,7 +7,7 @@ import torch
 import typer
 from tqdm.auto import tqdm
 
-from .model import MLP, NoiseScheduler
+from .model import Block, NoiseScheduler
 
 app = typer.Typer()
 
@@ -28,7 +28,7 @@ def main(
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    model = MLP(
+    model = Block(
         hidden_size=hidden_size,
         hidden_layers=hidden_layers,
         embedding_size=embedding_size,

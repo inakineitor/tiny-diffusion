@@ -9,7 +9,7 @@ from .positional_embeddings import (
 )
 
 
-class Block(torch.nn.Module):
+class MLP(torch.nn.Module):
     ff: torch.nn.Linear
     act: torch.nn.GELU
 
@@ -29,7 +29,7 @@ class Block(torch.nn.Module):
         return cast(torch.Tensor, super().__call__(x))
 
 
-class MLP(torch.nn.Module):
+class Block(torch.nn.Module):
     time_mlp: PositionalEmbeddingLayer
     input_mlp_x1: PositionalEmbeddingLayer
     input_mlp_x2: PositionalEmbeddingLayer
@@ -53,7 +53,7 @@ class MLP(torch.nn.Module):
         self.joint_mlp = torch.nn.Sequential(
             torch.nn.Linear(concat_size, hidden_size),
             torch.nn.GELU(),
-            *(Block(hidden_size) for _ in range(hidden_layers)),
+            *(MLP(hidden_size) for _ in range(hidden_layers)),
             torch.nn.Linear(hidden_size, 2),
         )
 

@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
 from . import datasets
-from .model import MLP, NoiseScheduler
+from .model import Block, NoiseScheduler
 
 
 class Dataset(StrEnum):
@@ -64,7 +64,7 @@ def main(
     ds = datasets.get_dataset(dataset.value)
     dataloader = DataLoader(ds, batch_size=train_batch_size, shuffle=True, drop_last=True)
 
-    model = MLP(
+    model = Block(
         hidden_size=hidden_size,
         hidden_layers=hidden_layers,
         embedding_size=embedding_size,
