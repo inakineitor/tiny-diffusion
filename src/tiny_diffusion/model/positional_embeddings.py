@@ -122,7 +122,7 @@ type EmbeddingType = Literal["sinusoidal", "linear", "learnable", "zero", "ident
 def make_positional_embedding(
     embedding_type: EmbeddingType,
     num_embedding_dims: int = 0,
-    scale: float = 0,
+    scale: float = 1.0,
 ):
     match embedding_type:
         case "sinusoidal":
