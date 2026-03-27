@@ -73,4 +73,3 @@ The use of sinusoidal embeddings for the inputs helps with learning high-frequen
 * lucidrains' [DDPM implementation in PyTorch](https://github.com/lucidrains/denoising-diffusion-pytorch).
 * Jonathan Ho's [implementation of DDPM](https://github.com/hojonathanho/diffusion).
 * InFoCusp's [DDPM implementation in tf](https://github.com/InFoCusp/diffusion_models).
-

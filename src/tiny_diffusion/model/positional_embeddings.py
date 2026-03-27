@@ -1,4 +1,4 @@
-'''Different methods for positional embeddings. These are not essential for understanding DDPMs, but are relevant for the ablation study.'''
+"""Different methods for positional embeddings. These are not essential for understanding DDPMs, but are relevant for the ablation study."""
 
 import torch
 from torch import nn
