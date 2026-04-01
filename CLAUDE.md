@@ -15,6 +15,9 @@ uv sync
 # Train a model
 uv run model-train --experiment-name "my_exp" --dataset dino --num-epochs 200
 
+# Resume training from a checkpoint
+uv run model-train --experiment-name "my_exp" --dataset dino --num-epochs 400 --resume data/output/experiments/my_exp/checkpoint.pth
+
 # Run inference on a trained model
 uv run model-infer data/output/experiments/my_exp/model.pth --num-samples 1000
 
@@ -49,7 +52,7 @@ uv run basedpyright src/
 
 ## Key Conventions
 
-- Training outputs go to `data/output/experiments/{experiment_name}/` containing `model.pth`, `loss.npy`, `frames.npy`, and `images/`
+- Training outputs go to `data/output/experiments/{experiment_name}/` containing `model.pth`, `checkpoint.pth`, `loss.npy`, `frames.npy`, and `images/`
 - Dino dataset reads from `data/input/dinosaur/datasaurus-dozen.tsv`
 - Device auto-detection: CUDA → MPS → CPU
 - All datasets use seeded random generators for reproducibility

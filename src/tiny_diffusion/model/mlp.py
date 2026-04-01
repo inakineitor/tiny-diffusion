@@ -35,6 +35,7 @@ class Block(torch.nn.Module):
     input_mlp_x2: PositionalEmbeddingLayer
     joint_mlp: torch.nn.Sequential
     num_classes: int
+    text_embedding_dim: int
     cfg_dropout_prob: float
 
     def __init__(
@@ -45,10 +46,12 @@ class Block(torch.nn.Module):
         time_embedding_type: EmbeddingType = "sinusoidal",
         embedding_type: EmbeddingType = "sinusoidal",
         num_classes: int = 0,
+        text_embedding_dim: int = 0,
         cfg_dropout_prob: float = 0.1,
     ):
         super().__init__()
         self.num_classes = num_classes
+        self.text_embedding_dim = text_embedding_dim
         self.cfg_dropout_prob = cfg_dropout_prob
 
         self.time_mlp = make_positional_embedding(time_embedding_type, embedding_size)
@@ -61,6 +64,10 @@ class Block(torch.nn.Module):
             # +1 for the unconditional/null class used in CFG
             self.class_embedding = torch.nn.Embedding(num_classes + 1, embedding_size)
             concat_size += embedding_size
+        elif text_embedding_dim > 0:
+            self.text_projection = torch.nn.Linear(text_embedding_dim, embedding_size)
+            self.null_text_embedding = torch.nn.Parameter(torch.zeros(text_embedding_dim))
+            concat_size += embedding_size
 
         self.joint_mlp = torch.nn.Sequential(
             torch.nn.Linear(concat_size, hidden_size),
@@ -70,7 +77,13 @@ class Block(torch.nn.Module):
         )
 
     @override
-    def forward(self, x: torch.Tensor, t: torch.Tensor, class_label: torch.Tensor | None = None):
+    def forward(
+        self,
+        x: torch.Tensor,
+        t: torch.Tensor,
+        class_label: torch.Tensor | None = None,
+        text_embedding: torch.Tensor | None = None,
+    ):
         x1_embedding = self.input_mlp_x1(x[:, 0])
         x2_embedding = self.input_mlp_x2(x[:, 1])
         time_embedding = self.time_mlp(t)
@@ -79,11 +92,18 @@ class Block(torch.nn.Module):
         if self.num_classes > 0:
             assert class_label is not None
             if self.training:
-                # CFG dropout: replace some labels with the null class index
                 mask = torch.rand(class_label.shape[0], device=class_label.device) < self.cfg_dropout_prob
                 class_label = class_label.clone()
                 class_label[mask] = self.num_classes  # null class
             embeddings.append(self.class_embedding(class_label))
+        elif self.text_embedding_dim > 0:
+            assert text_embedding is not None
+            if self.training:
+                batch_size = text_embedding.shape[0]
+                mask = torch.rand(batch_size, device=text_embedding.device) < self.cfg_dropout_prob
+                null_emb = self.null_text_embedding.unsqueeze(0).expand(batch_size, -1)
+                text_embedding = torch.where(mask.unsqueeze(-1), null_emb, text_embedding)
+            embeddings.append(self.text_projection(text_embedding))
 
         x = torch.cat(embeddings, dim=-1)
         x = cast(torch.Tensor, self.joint_mlp(x))

@@ -43,6 +43,22 @@ NUM_DATASAURUS_SHAPES = len(DATASAURUS_SHAPES)
 
 SHAPE_TO_INDEX: dict[str, int] = {name: i for i, name in enumerate(DATASAURUS_SHAPES)}
 
+SHAPE_DESCRIPTIONS: dict[str, str] = {
+    "away": "points scattered away from center",
+    "bullseye": "bullseye target with concentric rings",
+    "circle": "circle",
+    "dino": "dinosaur",
+    "dots": "dots arranged in a grid",
+    "h_lines": "horizontal parallel lines",
+    "high_lines": "lines at varying heights",
+    "slant_down": "lines slanting downward",
+    "slant_up": "lines slanting upward",
+    "star": "star",
+    "v_lines": "vertical parallel lines",
+    "wide_lines": "widely spaced parallel lines",
+    "x_shape": "X shape with crossing lines",
+}
+
 
 def dino_dataset(n: int = 8000, shapes: list[DatasaurusShape] | None = None):
     df = pl.read_csv(_DATA_DIR / "datasaurus-dozen.tsv", separator="\t")

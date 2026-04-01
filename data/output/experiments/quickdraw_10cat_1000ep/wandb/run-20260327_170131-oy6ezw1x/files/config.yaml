@@ -1,0 +1,97 @@
+_wandb:
+    value:
+        cli_version: 0.25.1
+        e:
+            wjkv9edvfmpf3l2mq1h9a21mq0s68vlj:
+                apple: {}
+                args:
+                    - --experiment-name
+                    - quickdraw_10cat_1000ep_text
+                    - --dataset
+                    - quickdraw
+                    - --quickdraw-num-categories
+                    - "10"
+                    - --text-conditioned
+                    - --num-epochs
+                    - "1000"
+                    - --learning-rate
+                    - "0.0001"
+                    - --wandb
+                codePath: .venv/bin/model-train
+                cpu_count: 18
+                cpu_count_logical: 18
+                disk:
+                    /:
+                        total: "3996276899840"
+                        used: "146596577280"
+                email: arangoinaki@gmail.com
+                executable: /Users/inakiarango/Documents/Personal/Repositories/test/tiny-diffusion/.venv/bin/python3
+                git:
+                    commit: 19fd3958b503a093eff73365d73e0d83b304ce2a
+                    remote: https://github.com/inakineitor/tiny-diffusion.git
+                host: Inakis-MBP-M5
+                memory:
+                    total: "137438953472"
+                os: macOS-26.4-arm64-arm-64bit-Mach-O
+                program: /Users/inakiarango/Documents/Personal/Repositories/test/tiny-diffusion/.venv/bin/model-train
+                python: CPython 3.14.3
+                root: /Users/inakiarango/Documents/Personal/Repositories/test/tiny-diffusion/data/output/experiments/quickdraw_10cat_1000ep
+                startedAt: "2026-03-28T00:01:31.838906Z"
+                writerId: wjkv9edvfmpf3l2mq1h9a21mq0s68vlj
+        m: []
+        python_version: 3.14.3
+        t:
+            "1":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 53
+                - 75
+            "2":
+                - 1
+                - 5
+                - 11
+                - 49
+                - 53
+                - 75
+            "3":
+                - 2
+                - 13
+                - 16
+                - 61
+            "4": 3.14.3
+            "5": 0.25.1
+            "6": 5.4.0
+            "12": 0.25.1
+            "13": darwin-arm64
+beta_schedule:
+    value: linear
+cfg_dropout:
+    value: 0.1
+dataset:
+    value: quickdraw
+embedding_size:
+    value: 128
+guidance_scale:
+    value: 3
+hidden_layers:
+    value: 3
+hidden_size:
+    value: 128
+input_embedding:
+    value: sinusoidal
+learning_rate:
+    value: 0.0001
+num_classes:
+    value: 0
+num_epochs:
+    value: 1000
+num_timesteps:
+    value: 50
+text_conditioned:
+    value: true
+time_embedding:
+    value: sinusoidal
+train_batch_size:
+    value: 32

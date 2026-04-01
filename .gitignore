@@ -248,3 +248,7 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,linux,windows,python
+
+# Quick, Draw! cached data (downloaded on demand)
+data/input/
+data/wandb/
